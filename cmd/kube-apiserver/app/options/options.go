@@ -56,6 +56,7 @@ type ServerRunOptions struct {
 	KubeletConfig             kubeletclient.KubeletClientConfig
 	KubernetesServiceNodePort int
 	MaxConnectionBytesPerSec  int64
+	ProxyCIDRWhitelist        kubeoptions.IPNetSlice
 	ServiceClusterIPRange     net.IPNet // TODO: make this a list
 	ServiceNodePortRange      utilnet.PortRange
 	SSHKeyfile                string
@@ -115,6 +116,7 @@ func NewServerRunOptions() *ServerRunOptions {
 		ServiceNodePortRange: kubeoptions.DefaultServiceNodePortRange,
 	}
 	s.ServiceClusterIPRange = kubeoptions.DefaultServiceIPCIDR
+	s.ProxyCIDRWhitelist = kubeoptions.DefaultProxyCIDRWhitelist
 
 	// Overwrite the default for storage data format.
 	s.Etcd.DefaultStorageMediaType = "application/vnd.kubernetes.protobuf"
@@ -181,6 +183,9 @@ func (s *ServerRunOptions) Flags() (fss apiserverflag.NamedFlagSets) {
 	fs.IPNetVar(&s.ServiceClusterIPRange, "service-cluster-ip-range", s.ServiceClusterIPRange, ""+
 		"A CIDR notation IP range from which to assign service cluster IPs. This must not "+
 		"overlap with any IP ranges assigned to nodes for pods.")
+
+	fs.Var(&s.ProxyCIDRWhitelist, "proxy-cidr-whitelist", ""+
+		"A comma-separated list of CIDR IP ranges which the API server can communicate with.")
 
 	fs.Var(&s.ServiceNodePortRange, "service-node-port-range", ""+
 		"A port range to reserve for services with NodePort visibility. "+

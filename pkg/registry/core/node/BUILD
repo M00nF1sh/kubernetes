@@ -14,6 +14,7 @@ go_library(
     ],
     importpath = "k8s.io/kubernetes/pkg/registry/core/node",
     deps = [
+        "//cmd/kube-apiserver/app/options:go_default_library",
         "//pkg/api/legacyscheme:go_default_library",
         "//pkg/apis/core:go_default_library",
         "//pkg/apis/core/validation:go_default_library",

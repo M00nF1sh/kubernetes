@@ -35,6 +35,7 @@ import (
 	pkgstorage "k8s.io/apiserver/pkg/storage"
 	"k8s.io/apiserver/pkg/storage/names"
 	utilfeature "k8s.io/apiserver/pkg/util/feature"
+	kubeapiserveroptions "k8s.io/kubernetes/cmd/kube-apiserver/app/options"
 	"k8s.io/kubernetes/pkg/api/legacyscheme"
 	api "k8s.io/kubernetes/pkg/apis/core"
 	"k8s.io/kubernetes/pkg/apis/core/validation"
@@ -204,6 +205,19 @@ func ResourceLocation(getter ResourceGetter, connection client.ConnectionInfoGet
 	info, err := connection.GetConnectionInfo(ctx, types.NodeName(name))
 	if err != nil {
 		return nil, nil, err
+	}
+
+	// REVIEW NOTE:
+	// I didn't see a better way to plumb this down here. Feature gates are globals too, but I'd be happy to get the CIDRs here another way
+	included, err := kubeapiserveroptions.ProxyCIDRWhitelist.ContainsHost(
+		ctx,
+		info.Hostname,
+	)
+	if err != nil {
+		return nil, nil, err
+	}
+	if !included {
+		return nil, nil, errors.NewBadRequest("Address is not allowed")
 	}
 
 	// We check if we want to get a default Kubelet's transport. It happens if either:

@@ -27,6 +27,18 @@ import (
 	"k8s.io/kubernetes/pkg/features"
 )
 
+func validateProxyCIDRWhitelist(options *ServerRunOptions) []error {
+	errors := []error{}
+
+	// if its empty, don't add any IPs to the list
+	for _, cidr := range options.ProxyCIDRWhitelist {
+		if cidr.IP == nil {
+			errors = append(errors, fmt.Errorf("invalid --proxy-cidr-whitelist specified"))
+		}
+	}
+	return errors
+}
+
 // TODO: Longer term we should read this from some config store, rather than a flag.
 func validateClusterIPFlags(options *ServerRunOptions) []error {
 	var errs []error
@@ -90,6 +102,9 @@ func (s *ServerRunOptions) Validate() []error {
 		errs = append(errs, fmt.Errorf("--apiserver-count should be a positive number, but value '%d' provided", s.MasterCount))
 	}
 	errs = append(errs, s.Etcd.Validate()...)
+	if es := validateProxyCIDRWhitelist(s); len(es) > 0 {
+		errs = append(errs, es...)
+	}
 	errs = append(errs, validateClusterIPFlags(s)...)
 	errs = append(errs, validateServiceNodePort(s)...)
 	errs = append(errs, s.SecureServing.Validate()...)

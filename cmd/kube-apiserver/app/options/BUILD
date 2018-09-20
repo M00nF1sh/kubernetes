@@ -12,6 +12,7 @@ go_library(
         "globalflags.go",
         "options.go",
         "validation.go",
+        "whitelist.go",
     ],
     importpath = "k8s.io/kubernetes/cmd/kube-apiserver/app/options",
     deps = [
