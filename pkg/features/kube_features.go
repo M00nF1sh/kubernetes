@@ -278,6 +278,12 @@ const (
 	// to the API server.
 	BoundServiceAccountTokenVolume utilfeature.Feature = "BoundServiceAccountTokenVolume"
 
+	// owner: @micahhausler
+	// alpha: v1.16
+	//
+	// External signing of projected service account tokens
+	ExternalKeyService utilfeature.Feature = "ExternalKeyService"
+
 	// owner: @Random-Liu
 	// beta: v1.11
 	//
@@ -444,6 +450,7 @@ var defaultKubernetesFeatureGates = map[utilfeature.Feature]utilfeature.FeatureS
 	TokenRequest:                                {Default: true, PreRelease: utilfeature.Beta},
 	TokenRequestProjection:                      {Default: true, PreRelease: utilfeature.Beta},
 	BoundServiceAccountTokenVolume:              {Default: false, PreRelease: utilfeature.Alpha},
+	ExternalKeyService:              			 {Default: false, PreRelease: utilfeature.Alpha},
 	CRIContainerLogRotation:                     {Default: true, PreRelease: utilfeature.Beta},
 	GCERegionalPersistentDisk:                   {Default: true, PreRelease: utilfeature.GA},
 	RunAsGroup:                                  {Default: false, PreRelease: utilfeature.Alpha},

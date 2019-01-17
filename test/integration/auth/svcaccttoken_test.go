@@ -86,7 +86,7 @@ func TestServiceAccountTokenCreate(t *testing.T) {
 			serviceaccount.NewValidator(serviceaccountgetter.NewGetterFromClient(gcs)),
 		),
 	)
-	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, sk)
+	tokenGenerator, err := serviceaccount.JWTTokenGenerator(iss, "", sk)
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
