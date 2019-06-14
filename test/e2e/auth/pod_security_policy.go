@@ -19,7 +19,7 @@ package auth
 import (
 	"fmt"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	policy "k8s.io/api/policy/v1beta1"
 	rbacv1beta1 "k8s.io/api/rbac/v1beta1"
 	apierrs "k8s.io/apimachinery/pkg/api/errors"
@@ -28,7 +28,6 @@ import (
 	"k8s.io/apiserver/pkg/authentication/serviceaccount"
 	clientset "k8s.io/client-go/kubernetes"
 	restclient "k8s.io/client-go/rest"
-	"k8s.io/kubernetes/pkg/security/apparmor"
 	"k8s.io/kubernetes/pkg/security/podsecuritypolicy/seccomp"
 	psputil "k8s.io/kubernetes/pkg/security/podsecuritypolicy/util"
 	"k8s.io/kubernetes/test/e2e/common"
@@ -164,12 +163,12 @@ func testPrivilegedPods(tester func(pod *v1.Pod)) {
 	})
 
 	if common.IsAppArmorSupported() {
-		By("Running a custom AppArmor profile pod", func() {
-			aa := restrictedPod("apparmor")
-			// Every node is expected to have the docker-default profile.
-			aa.Annotations[apparmor.ContainerAnnotationKeyPrefix+"pause"] = "localhost/docker-default"
-			tester(aa)
-		})
+		// By("Running a custom AppArmor profile pod", func() {
+		// 	aa := restrictedPod("apparmor")
+		// 	// Every node is expected to have the docker-default profile.
+		// 	aa.Annotations[apparmor.ContainerAnnotationKeyPrefix+"pause"] = "localhost/docker-default"
+		// 	tester(aa)
+		// })
 	}
 
 	By("Running an unconfined Seccomp pod", func() {
@@ -234,8 +233,8 @@ func restrictedPod(name string) *v1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				v1.SeccompPodAnnotationKey:                      v1.SeccompProfileRuntimeDefault,
-				apparmor.ContainerAnnotationKeyPrefix + "pause": apparmor.ProfileRuntimeDefault,
+				v1.SeccompPodAnnotationKey: v1.SeccompProfileRuntimeDefault,
+				// apparmor.ContainerAnnotationKeyPrefix + "pause": apparmor.ProfileRuntimeDefault,
 			},
 		},
 		Spec: v1.PodSpec{
@@ -290,10 +289,10 @@ func restrictedPSP(name string) *policy.PodSecurityPolicy {
 		ObjectMeta: metav1.ObjectMeta{
 			Name: name,
 			Annotations: map[string]string{
-				seccomp.AllowedProfilesAnnotationKey:  v1.SeccompProfileRuntimeDefault,
-				seccomp.DefaultProfileAnnotationKey:   v1.SeccompProfileRuntimeDefault,
-				apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
-				apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
+				seccomp.AllowedProfilesAnnotationKey: v1.SeccompProfileRuntimeDefault,
+				seccomp.DefaultProfileAnnotationKey:  v1.SeccompProfileRuntimeDefault,
+				// apparmor.AllowedProfilesAnnotationKey: apparmor.ProfileRuntimeDefault,
+				// apparmor.DefaultProfileAnnotationKey:  apparmor.ProfileRuntimeDefault,
 			},
 		},
 		Spec: policy.PodSecurityPolicySpec{
