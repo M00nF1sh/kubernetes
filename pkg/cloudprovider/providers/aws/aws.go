@@ -580,11 +580,48 @@ type awsSDKProvider struct {
 	regionDelayers map[string]*CrossRequestRetryDelay
 }
 
-func newAWSSDKProvider(creds *credentials.Credentials) *awsSDKProvider {
-	return &awsSDKProvider{
-		creds:          creds,
+func newAWSSDKProvider(cfg *CloudConfig) (*awsSDKProvider, error) {
+	sdkProvider := &awsSDKProvider{
 		regionDelayers: make(map[string]*CrossRequestRetryDelay),
 	}
+	metadata, err := sdkProvider.Metadata()
+	if err != nil {
+		return nil, fmt.Errorf("error creating AWS metadata client: %q", err)
+	}
+	if err := updateConfigZone(cfg, metadata); err != nil {
+		return nil, fmt.Errorf("unable to determine AWS zone from cloud provider config or EC2 instance metadata: %v", err)
+	}
+
+	sess, err := session.NewSession(&aws.Config{})
+	if err != nil {
+		return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
+	}
+
+	var provider credentials.Provider
+	if cfg.Global.RoleARN == "" {
+		provider = &ec2rolecreds.EC2RoleProvider{
+			Client: ec2metadata.New(sess),
+		}
+	} else {
+		klog.Infof("Using AWS assumed role %v", cfg.Global.RoleARN)
+		regionName, err := azToRegion(cfg.Global.Zone)
+		if err != nil {
+			return nil, err
+		}
+		provider = &stscreds.AssumeRoleProvider{
+			Client:  sts.New(sess, aws.NewConfig().WithRegion(regionName)),
+			RoleARN: cfg.Global.RoleARN,
+		}
+	}
+
+	creds := credentials.NewChainCredentials(
+		[]credentials.Provider{
+			&credentials.EnvProvider{},
+			provider,
+			&credentials.SharedCredentialsProvider{},
+		})
+	sdkProvider.creds = creds
+	return sdkProvider, nil
 }
 
 func (p *awsSDKProvider) addHandlers(regionName string, h *request.Handlers) {
@@ -956,32 +993,10 @@ func init() {
 			return nil, fmt.Errorf("unable to read AWS cloud provider config file: %v", err)
 		}
 
-		sess, err := session.NewSession(&aws.Config{})
+		aws, err := newAWSSDKProvider(cfg)
 		if err != nil {
-			return nil, fmt.Errorf("unable to initialize AWS session: %v", err)
+			return nil, err
 		}
-
-		var provider credentials.Provider
-		if cfg.Global.RoleARN == "" {
-			provider = &ec2rolecreds.EC2RoleProvider{
-				Client: ec2metadata.New(sess),
-			}
-		} else {
-			klog.Infof("Using AWS assumed role %v", cfg.Global.RoleARN)
-			provider = &stscreds.AssumeRoleProvider{
-				Client:  sts.New(sess),
-				RoleARN: cfg.Global.RoleARN,
-			}
-		}
-
-		creds := credentials.NewChainCredentials(
-			[]credentials.Provider{
-				&credentials.EnvProvider{},
-				provider,
-				&credentials.SharedCredentialsProvider{},
-			})
-
-		aws := newAWSSDKProvider(creds)
 		return newAWSCloud(*cfg, aws)
 	})
 }
@@ -1044,16 +1059,11 @@ func newAWSCloud(cfg CloudConfig, awsServices Services) (*Cloud, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error creating AWS metadata client: %q", err)
 	}
-
 	err = updateConfigZone(&cfg, metadata)
 	if err != nil {
 		return nil, fmt.Errorf("unable to determine AWS zone from cloud provider config or EC2 instance metadata: %v", err)
 	}
-
 	zone := cfg.Global.Zone
-	if len(zone) <= 1 {
-		return nil, fmt.Errorf("invalid AWS zone in config file: %s", zone)
-	}
 	regionName, err := azToRegion(zone)
 	if err != nil {
 		return nil, err
