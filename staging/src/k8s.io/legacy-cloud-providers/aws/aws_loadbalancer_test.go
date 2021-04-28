@@ -19,6 +19,7 @@ limitations under the License.
 package aws
 
 import (
+	"github.com/aws/aws-sdk-go/service/elbv2"
 	"k8s.io/apimachinery/pkg/types"
 	"testing"
 
@@ -537,6 +538,352 @@ func TestFilterTargetNodes(t *testing.T) {
 			} else {
 				assert.Empty(t, targetNodes)
 			}
+		})
+	}
+}
+
+func TestCloud_chunkTargetDescriptions(t *testing.T) {
+	type args struct {
+		targets   []*elbv2.TargetDescription
+		chunkSize int
+	}
+	tests := []struct {
+		name string
+		args args
+		want [][]*elbv2.TargetDescription
+	}{
+		{
+			name: "can be evenly chunked",
+			args: args{
+				targets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+				chunkSize: 2,
+			},
+			want: [][]*elbv2.TargetDescription{
+				{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+				},
+				{
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+		},
+		{
+			name: "cannot be evenly chunked",
+			args: args{
+				targets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+				chunkSize: 3,
+			},
+			want: [][]*elbv2.TargetDescription{
+				{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+				},
+				{
+
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+		},
+		{
+			name: "chunkSize equal to total count",
+			args: args{
+				targets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+				chunkSize: 4,
+			},
+			want: [][]*elbv2.TargetDescription{
+				{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+		},
+		{
+			name: "chunkSize greater than total count",
+			args: args{
+				targets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+				chunkSize: 10,
+			},
+			want: [][]*elbv2.TargetDescription{
+				{
+					{
+						Id:   aws.String("i-abcdefg1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg3"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdefg4"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+		},
+		{
+			name: "chunk nil slice",
+			args: args{
+				targets:   nil,
+				chunkSize: 2,
+			},
+			want: nil,
+		},
+		{
+			name: "chunk empty slice",
+			args: args{
+				targets:   []*elbv2.TargetDescription{},
+				chunkSize: 2,
+			},
+			want: nil,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Cloud{}
+			got := c.chunkTargetDescriptions(tt.args.targets, tt.args.chunkSize)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestCloud_diffTargetGroupTargets(t *testing.T) {
+	type args struct {
+		expectedTargets []*elbv2.TargetDescription
+		actualTargets   []*elbv2.TargetDescription
+	}
+	tests := []struct {
+		name                    string
+		args                    args
+		wantTargetsToRegister   []*elbv2.TargetDescription
+		wantTargetsToDeregister []*elbv2.TargetDescription
+	}{
+		{
+			name: "all targets to register",
+			args: args{
+				expectedTargets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdef1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef2"),
+						Port: aws.Int64(8080),
+					},
+				},
+				actualTargets: nil,
+			},
+			wantTargetsToRegister: []*elbv2.TargetDescription{
+				{
+					Id:   aws.String("i-abcdef1"),
+					Port: aws.Int64(8080),
+				},
+				{
+					Id:   aws.String("i-abcdef2"),
+					Port: aws.Int64(8080),
+				},
+			},
+			wantTargetsToDeregister: nil,
+		},
+		{
+			name: "all targets to deregister",
+			args: args{
+				expectedTargets: nil,
+				actualTargets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdef1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef2"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+			wantTargetsToRegister: nil,
+			wantTargetsToDeregister: []*elbv2.TargetDescription{
+				{
+					Id:   aws.String("i-abcdef1"),
+					Port: aws.Int64(8080),
+				},
+				{
+					Id:   aws.String("i-abcdef2"),
+					Port: aws.Int64(8080),
+				},
+			},
+		},
+		{
+			name: "some targets to register and deregister",
+			args: args{
+				expectedTargets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdef1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef4"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef5"),
+						Port: aws.Int64(8080),
+					},
+				},
+				actualTargets: []*elbv2.TargetDescription{
+					{
+						Id:   aws.String("i-abcdef1"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef2"),
+						Port: aws.Int64(8080),
+					},
+					{
+						Id:   aws.String("i-abcdef3"),
+						Port: aws.Int64(8080),
+					},
+				},
+			},
+			wantTargetsToRegister: []*elbv2.TargetDescription{
+				{
+					Id:   aws.String("i-abcdef4"),
+					Port: aws.Int64(8080),
+				},
+				{
+					Id:   aws.String("i-abcdef5"),
+					Port: aws.Int64(8080),
+				},
+			},
+			wantTargetsToDeregister: []*elbv2.TargetDescription{
+				{
+					Id:   aws.String("i-abcdef2"),
+					Port: aws.Int64(8080),
+				},
+				{
+					Id:   aws.String("i-abcdef3"),
+					Port: aws.Int64(8080),
+				},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := &Cloud{}
+			gotTargetsToRegister, gotTargetsToDeregister := c.diffTargetGroupTargets(tt.args.expectedTargets, tt.args.actualTargets)
+			assert.Equal(t, tt.wantTargetsToRegister, gotTargetsToRegister)
+			assert.Equal(t, tt.wantTargetsToDeregister, gotTargetsToDeregister)
 		})
 	}
 }
