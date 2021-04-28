@@ -21,6 +21,7 @@ package aws
 import (
 	"crypto/sha1"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"regexp"
@@ -681,6 +682,9 @@ func (c *Cloud) ensureTargetGroup(targetGroup *elbv2.TargetGroup, serviceName ty
 }
 
 func (c *Cloud) ensureTargetGroupTargets(tgARN string, expectedTargets []*elbv2.TargetDescription, actualTargets []*elbv2.TargetDescription) error {
+	expectedTargetsJson, _ := json.Marshal(expectedTargets)
+	actualTargetsJson, _ := json.Marshal(actualTargets)
+	klog.Warningf("ensureTargetGroupTargets: %v", expectedTargetsJson, actualTargetsJson)
 	targetsToRegister, targetsToDeregister := c.diffTargetGroupTargets(expectedTargets, actualTargets)
 	if len(targetsToRegister) > 0 {
 		targetsToRegisterChunks := c.chunkTargetDescriptions(targetsToRegister, defaultRegisterTargetsChunkSize)
@@ -689,6 +693,8 @@ func (c *Cloud) ensureTargetGroupTargets(tgARN string, expectedTargets []*elbv2.
 				TargetGroupArn: aws.String(tgARN),
 				Targets:        targetsChunk,
 			}
+			targetsChunkJson, _ := json.Marshal(targetsChunk)
+			klog.Warningf("RegisterTargets: %v", targetsChunkJson)
 			if _, err := c.elbv2.RegisterTargets(req); err != nil {
 				return fmt.Errorf("error trying to register targets in target group: %q", err)
 			}
@@ -701,6 +707,8 @@ func (c *Cloud) ensureTargetGroupTargets(tgARN string, expectedTargets []*elbv2.
 				TargetGroupArn: aws.String(tgARN),
 				Targets:        targetsChunk,
 			}
+			targetsChunkJson, _ := json.Marshal(targetsChunk)
+			klog.Warningf("RegisterTargets: %v", targetsChunkJson)
 			if _, err := c.elbv2.DeregisterTargets(req); err != nil {
 				return fmt.Errorf("error trying to deregister targets in target group: %q", err)
 			}
